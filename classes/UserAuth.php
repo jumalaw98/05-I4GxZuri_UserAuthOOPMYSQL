@@ -1,56 +1,87 @@
 <?php
 include_once 'Dbh.php';
-session_start();
 
-class UserAuth extends Dbh{
+
+class UserAuth extends Dbh
+{
     private static $db;
 
-    public function __construct(){
-        $this->db = new Dbh();
+    public function __construct()
+    {
+        self::$db = new Dbh();
     }
 
-    public function register($fullname, $email, $password, $confirmPassword, $country, $gender){
-        $conn = $this->db->connect();
-        if($this->confirmPasswordMatch($password, $confirmPassword)){
-            $sql = "INSERT INTO Students (`full_names`, `email`, `password`, `country`, `gender`) VALUES ('$fullname','$email', '$password', '$country', '$gender')";
-            if($conn->query($sql)){
-               echo "Ok";
-            } else {
-                echo "Opps". $conn->error;
-            }
-        }
+ 
+    //Register User
 
-        
-    }
 
-    public function login($email, $password){
-        $conn = $this->db->connect();
-        $sql = "SELECT * FROM Students WHERE email='$email' AND `password`='$password'";
-        $result = $conn->query($sql);
-        if($result->num_rows > 0){
-            $_SESSION['email'] = $email;
-            header("Location: ../dashboard.php");
+    public function register($fullname, $email, $password, $confirmPassword, $country, $gender)
+    {
+        $conn = self::$db->connect();
+        if ($this->checkEmailExist($email)) {
+            echo "<script> alert('User With this Email Exist');</script> ";
         } else {
-            header("Location: forms/login.php");
+            if ($this->confirmPasswordMatch($password, $confirmPassword)) {
+                $sql = "INSERT INTO Students (`full_names`, `email`, `password`, `country`, `gender`) VALUES ('$fullname','$email', '$password', '$country', '$gender')";
+                if ($conn->query($sql)) {
+                    echo "Ok";
+                } else {
+                    echo "Opps" . $conn->error;
+                }
+            } else
+                echo "<script> alert('Password Does not Match');</script> ";
         }
     }
 
-    public function getUser($username){
-        $conn = $this->db->connect();
+
+    // Login User
+  
+
+    public function login($email, $password)
+    {
+        $conn = self::$db->connect();
+        $sql = "SELECT * FROM Students WHERE email='$email' AND `password`='$password' LIMIT 1";
+        $result = $conn->query($sql);
+        if ($result->num_rows > 0) {
+            $userData = $result->fetch_assoc();
+            if ($userData['email'] === $email && $userData['password'] === $password) {
+                session_start();
+
+                $_SESSION['username'] = $userData['full_names'];
+                header("Location: dashboard.php?login=Success");
+            } else header("Location: forms/login.php?error=WrongPasswordOrEmail");
+        } else {
+            header("Location: forms/login.php?error=WrongPasswordOrEmail");
+            exit();
+        }
+    }
+
+  
+    // Get User
+
+    public function getUser($username)
+    {
+        $conn = self::$db->connect();
         $sql = "SELECT * FROM users WHERE username = '$username'";
         $result = $conn->query($sql);
-        if($result->num_rows > 0){
+        if ($result->num_rows > 0) {
             return $result->fetch_assoc();
         } else {
             return false;
         }
     }
 
-    public function getAllUsers(){
-        $conn = $this->db->connect();
+
+  
+    //To Get All User
+    
+
+    public function getAllUsers()
+    {
+        $conn = self::$db->connect();
         $sql = "SELECT * FROM Students";
         $result = $conn->query($sql);
-        echo"<html>
+        echo "<html>
         <head>
         <link rel='stylesheet' href='https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css' integrity='sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T' crossorigin='anonymous'>
         </head>
@@ -60,66 +91,129 @@ class UserAuth extends Dbh{
         <tr style='height: 40px'>
             <thead class='thead-dark'> <th>ID</th><th>Full Names</th> <th>Email</th> <th>Gender</th> <th>Country</th> <th>Action</th>
         </thead></tr>";
-        if($result->num_rows > 0){
-            while($data = mysqli_fetch_assoc($result)){
-                //show data
-                echo "<tr style='height: 20px'>".
-                    "<td style='width: 50px; background: gray'>" . $data['id'] . "</td>
-                    <td style='width: 150px'>" . $data['full_names'] .
-                    "</td> <td style='width: 150px'>" . $data['email'] .
-                    "</td> <td style='width: 150px'>" . $data['gender'] . 
-                    "</td> <td style='width: 150px'>" . $data['country'] . 
-                    "</td>
-                    <td style='width: 150px'> 
+        if ($result->num_rows > 0) {
+            while ($data = mysqli_fetch_assoc($result)) {
+
+                //showing data
+                echo "<tr style='height: 20px'>" .
+                    "<td style='width: 50px; background: gray'>" . $data['id'] . "</td>" .
+                    "<td style='width: 150px'>" . $data['full_names'] . "</td>" .
+                    "<td style='width: 150px'>" . $data['email'] . "</td>" .
+                    " <td style='width: 150px'>" . $data['gender'] . "</td>" .
+                    "<td style='width: 150px'>" . $data['country'] . "</td>" .
+                    "<td style='width: 150px'> 
                     <form action='action.php' method='post'>
                     <input type='hidden' name='id'" .
-                     "value=" . $data['id'] . ">".
-                    "<button class='btn btn-danger' type='submit', name='delete'> DELETE </button> </form> </td>".
+                    "value=" . $data['id'] . ">" .
+                    "<button class='btn btn-danger' type='submit' name='delete'> DELETE </button> </form> </td>" .
                     "</tr>";
             }
             echo "</table></table></center></body></html>";
         }
     }
 
-    public function deleteUser($id){
-        $conn = $this->db->connect();
+
+    
+    // To Delete User
+    
+
+    public function deleteUser($id)
+    {
+        $conn = UserAuth::$db->connect();
+
         $sql = "DELETE FROM Students WHERE id = '$id'";
-        if($conn->query($sql) === TRUE){
-            header("refresh:0.5; url=action.php?all");
+        if ($conn->query($sql) === TRUE) {
+            header("refresh:0.5; url=action.php?all=");
         } else {
-            header("refresh:0.5; url=action.php?all=?message=Error");
+            header("refresh:0.5; url=action.php?all&message=Error");
         }
     }
 
-    public function updateUser($username, $password){
-        $conn = $this->db->connect();
-        $sql = "UPDATE users SET password = '$password' WHERE username = '$username'";
-        if($conn->query($sql) === TRUE){
-            header("Location: ../dashboard.php?update=success");
+    // To Update User
+    
+
+    public function updateUser($email, $password)
+    {
+        $conn = self::$db->connect();
+        $sql = "UPDATE students SET password = '$password' WHERE email = '$email' LIMIT 1";
+        if ($conn->query($sql) === TRUE) {
+            header("Location: forms/login.php?update=UpdateSuccessful");
+            exit();
         } else {
-            header("Location: forms/resetpassword.php?error=1");
+            header("Location: forms/resetpassword.php?error=WrongEmail");
+            exit();
         }
     }
 
-    public function getUserByUsername($username){
-        $conn = $this->db->connect();
-        $sql = "SELECT * FROM users WHERE username = '$username'";
+
+    
+    // To Get User By Name
+    
+    public function checkEmailExist($email)
+    {
+        $conn = self::$db->connect();
+        $sql = "SELECT * FROM students WHERE email = '$email'";
         $result = $conn->query($sql);
-        if($result->num_rows > 0){
-            return $result->fetch_assoc();
+        if ($result->num_rows > 0) {
+            return true;
         } else {
             return false;
         }
     }
 
-    public function logout($username){
-        session_start();
-        session_destroy();
-        header('Location: index.php');
+
+    
+    //  To Logout User
+    
+
+    public function logout($email)
+    {
+        if (isset($_SESSION['username']) == ['username']) {
+            session_unset();
+            session_destroy();
+            header("Location: forms/login.php");
+        }
     }
 
-    public function confirmPasswordMatch($password, $confirmPassword){
-        if($password === $confirmPassword){
+
+    
+    // To ConfirmPassword
+ 
+
+    public function confirmPasswordMatch($password, $confirmPassword)
+    {
+        if ($password === $confirmPassword) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+   
+    // Method To Check if a User Exist(I added this method)
+  
+    public function UserExist($email, $password)
+    {
+        $conn = self::$db->connect();
+        $sql = "SELECT email,password FROM students WHERE email = '$email' OR password = '$password' ";
+        $result = $conn->query($sql);
+        if ($result->num_rows > 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    
+    // To Check if password Exist(I added this method)
+   
+
+    public function PasswordExist($password)
+    {
+        $conn = self::$db->connect();
+        $sql = "SELECT password FROM students WHERE password = '$password' ";
+        $result = $conn->query($sql);
+        if ($result->num_rows > 0) {
             return true;
         } else {
             return false;
